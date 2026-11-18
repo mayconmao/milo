@@ -1,0 +1,105 @@
+classDiagram
+    direction LR
+
+    class Message {
+        <<entity · imutável>>
+        id
+        user_id
+        channel: Channel
+        external_id
+        text
+        received_at
+    }
+
+    class Interpretation {
+        <<registro do LLM>>
+        id
+        message_id
+        intent: Intent
+        payload: JSON
+        model
+        prompt_version
+    }
+
+    class Operation {
+        <<aggregate root>>
+        id
+        user_id
+        kind: OperationKind
+        status: OperationStatus
+        source_message_id
+        provenance: dict~field, Provenance~
+        commit()
+        cancel()
+        correct(field, value, message_id)
+    }
+
+    class Transaction {
+        type: TransactionType
+        amount: Money
+        description
+        category_id
+        asset_id?
+        purpose: Purpose
+        tags
+        occurred_at
+    }
+
+    class DeliveryRecord {
+        quantity
+        amount: Money?
+        occurred_at
+    }
+
+    class Reminder {
+        title
+        due_at
+        recurrence?
+        amount: Money?
+    }
+
+    class PendingClarification {
+        <<aggregate root>>
+        id
+        operation_id
+        field
+        prompt_message_id
+        status: PendingStatus
+        expires_at
+        answer(value)
+        expire()
+    }
+
+    class Category {
+        <<dado no banco>>
+        id
+        user_id?
+        parent_id?
+        name
+        slug
+    }
+
+    class Asset {
+        <<dado no banco>>
+        id
+        user_id
+        kind: AssetKind
+        name
+        is_default
+    }
+
+    class Money {
+        <<value object>>
+        amount: Decimal
+        currency = BRL
+    }
+
+    Message "1" --> "0..1" Interpretation : interpretada em
+    Message "1" --> "0..1" Operation : origina
+    Operation "1" *-- "1" Transaction : detalhe
+    Operation "1" *-- "1" DeliveryRecord : detalhe
+    Operation "1" *-- "1" Reminder : detalhe
+    PendingClarification "0..1" --> "1" Operation : aguarda campo de
+    Transaction --> Category
+    Transaction --> Asset
+    Category --> Category : parent

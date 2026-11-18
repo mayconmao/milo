@@ -1,0 +1,34 @@
+flowchart TD
+    A([Mensagem recebida]) --> B{Duplicada?<br/>update_id já visto}
+    B -- sim --> Z1([Ignorar])
+    B -- não --> C[Salvar mensagem original<br/>imutável]
+    C --> D{Existe pergunta<br/>pendente?}
+
+    D -- sim --> E{Expirou?}
+    E -- sim --> E1[Pendência EXPIRED<br/>rascunho CANCELLED] --> F
+    E -- não --> G{Responde à<br/>pergunta pendente?<br/>reply_to ou resolvedor}
+    G -- sim --> H[Preencher campo pendente<br/>origem = user_stated]
+    H --> M
+    G -- não --> F
+
+    D -- não --> F[Interpretação pelo LLM<br/>saída estruturada]
+    F --> V{Pydantic válido?}
+    V -- não --> V1[Tentar mais uma vez] --> V2{Válido?}
+    V2 -- não --> U
+    V2 -- sim --> I
+    V -- sim --> I{Intenção}
+
+    I -- desconhecida --> U[Pedir para reformular]
+    I -- consulta --> Q[Consulta somente leitura<br/>SQL calcula os totais] --> R1([Responder com o resultado])
+    I -- corrigir / desfazer --> K[Carregar última<br/>operação gravada] --> K1[Aplicar alteração<br/>manter histórico] --> R2([Responder com novo resumo])
+    I -- registrar --> L[Regras de domínio<br/>derivar categoria<br/>aplicar padrões do usuário]
+    L --> M{Faltam campos<br/>obrigatórios?<br/>calculado pelo backend}
+    M -- sim --> N[Salvar operação DRAFT<br/>+ pergunta pendente<br/>com expires_at] --> R3([Fazer UMA pergunta])
+    M -- não --> O[Gravar operação<br/>status COMMITTED] --> R4([Responder resumo<br/>com botão Desfazer])
+
+    classDef llm fill:#fdf2e9,stroke:#e67e22,color:#000
+    classDef state fill:#eaf2f8,stroke:#2e86c1,color:#000
+    classDef reply fill:#e9f7ef,stroke:#27ae60,color:#000
+    class F,V1 llm
+    class C,E1,N,O,K1 state
+    class R1,R2,R3,R4,U reply
