@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from milo!")
+"""milo: personal assistant over Telegram."""
