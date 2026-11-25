@@ -1,0 +1,41 @@
+# Runs on every push to main and on every pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The workflow only reads the code. Least privilege for the GitHub token.
+permissions:
+  contents: read
+
+# A new push cancels the run still going for the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+
+      # --locked fails if uv.lock is out of date with pyproject.toml.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # Same hooks as the local pre-commit, on every file.
+      - name: Lint and format
+        run: uv run pre-commit run --all-files --show-diff-on-failure
+
+      - name: Type check
+        run: uv run mypy src tests
+
+      - name: Tests
+        run: uv run pytest -q
