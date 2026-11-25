@@ -1,7 +1,7 @@
 # Conversation flow
 
 How milo turns one incoming message into a reply. The LLM interprets; the backend decides.
-Product rules behind this flow live in [`PRODUCT.md`](PRODUCT.md).
+Product rules behind this flow live in [`PRODUCT.md`](PRODUCT.md); v1 domain decisions (M1–M8) in [`domain-v1.md`](domain-v1.md).
 
 ```mermaid
 flowchart TD
@@ -23,6 +23,7 @@ flowchart TD
     V -- yes --> I{Intent}
 
     I -- unknown --> U[Ask user to rephrase]
+    I -- small_talk / out_of_scope /<br/>create_reminder --> R6([Fixed reply<br/>nothing saved])
     I -- query --> Q[Run read-only query<br/>SQL computes totals] --> R1([Reply with answer])
     I -- correct / undo --> K[Load last committed<br/>operation] --> K1[Apply change<br/>keep audit trail] --> R2([Reply with new summary])
     I -- record --> L[Domain engine<br/>derive category<br/>apply user defaults]
@@ -37,7 +38,7 @@ flowchart TD
     classDef reply fill:#e9f7ef,stroke:#27ae60,color:#000
     class F,V1 llm
     class C,N,O,K1,DP state
-    class R1,R2,R3,R4,R5,U reply
+    class R1,R2,R3,R4,R5,R6,U reply
 ```
 
 To edit in draw.io: Arrange → Insert → Advanced → Mermaid, then paste the block above.
@@ -52,12 +53,13 @@ Domain-level intents (what the user wants), not CRUD verbs.
 |---|---|---|
 | `record_expense` | "combustivel entregas 30" | yes |
 | `record_income` | "recebi 200 do frete" | yes |
-| `record_deliveries` | "entregas realizadas 160" | yes |
-| `create_reminder` | "me lembra de pagar o cartão dia 10" | yes |
 | `query` | "quanto gastei de combustível esse mês?" | no |
 | `correct_last` | "não, foi 130" | yes |
 | `undo_last` | "apaga o último" | yes |
-| `unknown` | anything else | no |
+| `create_reminder` | "me lembra de pagar o cartão dia 10" | no — recognized, unsupported in v1 |
+| `out_of_scope` | "qual o melhor celular até 2 mil?" | no |
+| `small_talk` | "bom dia", "valeu" | no |
+| `unknown` | anything Milo did not understand | no |
 
 Answering a pending question is **not** an intent: it is resolved by routing (pending state) before interpretation.
 
@@ -69,12 +71,16 @@ Answering a pending question is **not** an intent: it is resolved by routing (pe
 | `Interpretation` | id, message_id, payload (JSONB), model, prompt_version, created_at | Raw LLM output, kept for evals. |
 | `Operation` | id, user_id, kind, status, source_message_id, created_at | Status: see `OperationStatus`. Recorded immediately; never a draft. |
 | `Transaction` | operation_id, type, amount (Decimal), description, category_id, asset_id?, purpose, tags[], occurred_at | `description` keeps the user's words ("chaveiro"). |
-| `DeliveryRecord` | operation_id, quantity, amount?, occurred_at | |
-| `Reminder` | operation_id, title, due_at, recurrence?, amount? | Fired by scheduler, not by the LLM. |
 | `Category` | id, user_id?, parent_id?, name, slug | Data, not enum. `user_id` null = system default. Max 2 levels. |
 | `Asset` | id, user_id, kind (vehicle/home), name, is_default | "Fox", "Yes 125", "Casa". |
 | `PendingClarification` | id, user_id, operation_id, field, prompt_message_id, status, asked_at, reminders_sent, closed_at?, close_reason? | Several may be open per user. Never expires into data loss; closed only after ≥1 daily closing. |
 | `FieldProvenance` | operation_id, field, source | `user_stated` / `user_confirmed` / `default` / `derived`. |
+| `OperationEvent` | id, operation_id, kind, old_value?, new_value?, source_message_id?, source (user/scheduler), created_at | Append-only history (M8). |
+| `Confirmation` | id, user_id, action, target_operation_ids, prompt_message_id, status, expires_at | [Yes]/[No] and [Redo]; valid 15 min (M4). |
+| `LearnedRule` | id, user_id, kind (alias/default), pattern, target, confirmed_at | Only created after the user's yes (D7, D15). |
+| `DailyClosing` | user_id, date, sent_at | One per user per date (idempotency, M7). |
+
+Reminders and income-activity records are not part of v1.
 
 ## Closed enums (code)
 
@@ -90,7 +96,7 @@ Answering a pending question is **not** an intent: it is resolved by routing (pe
 2. **Backend computes missing fields.** Required fields are defined per operation kind in code; the LLM never reports `missing_fields`.
 3. **Ask one question at a time**, and only for required fields.
 4. **Asset is required only when ambiguous**: if the user has one asset of the relevant kind, use it (`derived`); if a default exists, use it and show it with a change button (`default`). A pattern seen in history never becomes a default on its own: Milo asks once and only a "yes" creates the default.
-5. **Category assignment is layered**: (1) learned mappings and deterministic rules first — including asset-dependent ones (chaveiro + casa → Residencial > Manutenção; chaveiro + carro → Transporte > Manutenção de veículo); (2) otherwise the LLM picks among **existing** categories; (3) if none fits, the operation stays pending with a suggestion. New categories and assets require the user's explicit yes.
+5. **Category assignment is layered**: (1) learned mappings and deterministic rules first — including asset-dependent ones (chaveiro + casa → `housing` > `home_maintenance`; chaveiro + carro → `transport` > `vehicle_maintenance`); (2) otherwise the LLM picks among **existing** categories; (3) if none fits, the operation stays pending with a suggestion. New categories and assets require the user's explicit yes.
 6. **Money is `Decimal`**, never float.
 7. **Totals come from SQL**, never from the LLM.
 8. **Pending clarifications never lose data.** A record with a known amount is saved immediately as `pending_clarification` and counts in totals. Follow-up happens in the daily closing (20:00); after appearing in at least one closing without an answer, it becomes `unclassified` and can still be completed later.

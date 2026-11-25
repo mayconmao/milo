@@ -45,19 +45,6 @@ classDiagram
         occurred_at
     }
 
-    class DeliveryRecord {
-        quantity
-        amount: Money?
-        occurred_at
-    }
-
-    class Reminder {
-        title
-        due_at
-        recurrence?
-        amount: Money?
-    }
-
     class PendingClarification {
         <<aggregate root>>
         id
@@ -71,6 +58,37 @@ classDiagram
         close_reason?
         answer(value)
         close_without_answer()
+    }
+
+    class OperationEvent {
+        <<append-only>>
+        id
+        operation_id
+        kind
+        old_value?
+        new_value?
+        source_message_id?
+        source
+        created_at
+    }
+
+    class Confirmation {
+        <<expira em 15 min>>
+        id
+        action
+        target_operation_ids
+        prompt_message_id
+        status
+        expires_at
+    }
+
+    class LearnedRule {
+        <<criada só com o sim do usuário>>
+        id
+        user_id
+        kind: RuleKind
+        pattern
+        target
     }
 
     class Category {
@@ -100,9 +118,9 @@ classDiagram
     Message "1" --> "0..1" Interpretation : interpretada em
     Message "1" --> "0..1" Operation : origina
     Operation "1" *-- "1" Transaction : detalhe
-    Operation "1" *-- "1" DeliveryRecord : detalhe
-    Operation "1" *-- "1" Reminder : detalhe
     PendingClarification "0..*" --> "1" Operation : aguarda campo de
+    Operation "1" *-- "0..*" OperationEvent : histórico
+    Confirmation "0..*" --> "1..*" Operation : confirma ação sobre
     Transaction --> Category
     Transaction --> Asset
     Category --> Category : parent

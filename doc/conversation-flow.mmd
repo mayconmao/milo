@@ -17,6 +17,7 @@ flowchart TD
     V -- sim --> I{Intenção}
 
     I -- desconhecida --> U[Pedir para reformular]
+    I -- small_talk / fora do escopo /<br/>lembrete --> R6([Resposta fixa<br/>nada é salvo])
     I -- consulta --> Q[Consulta somente leitura<br/>SQL calcula os totais] --> R1([Responder com o resultado])
     I -- corrigir / desfazer --> K[Carregar última<br/>operação gravada] --> K1[Aplicar alteração<br/>manter histórico] --> R2([Responder com novo resumo])
     I -- registrar --> L[Regras de domínio<br/>derivar categoria<br/>aplicar padrões do usuário]
@@ -31,4 +32,4 @@ flowchart TD
     classDef reply fill:#e9f7ef,stroke:#27ae60,color:#000
     class F,V1 llm
     class C,N,O,K1,DP state
-    class R1,R2,R3,R4,R5,U reply
+    class R1,R2,R3,R4,R5,R6,U reply
