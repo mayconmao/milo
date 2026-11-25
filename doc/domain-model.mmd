@@ -65,9 +65,12 @@ classDiagram
         field
         prompt_message_id
         status: PendingStatus
-        expires_at
+        asked_at
+        reminders_sent
+        closed_at?
+        close_reason?
         answer(value)
-        expire()
+        close_without_answer()
     }
 
     class Category {
@@ -99,7 +102,7 @@ classDiagram
     Operation "1" *-- "1" Transaction : detalhe
     Operation "1" *-- "1" DeliveryRecord : detalhe
     Operation "1" *-- "1" Reminder : detalhe
-    PendingClarification "0..1" --> "1" Operation : aguarda campo de
+    PendingClarification "0..*" --> "1" Operation : aguarda campo de
     Transaction --> Category
     Transaction --> Asset
     Category --> Category : parent

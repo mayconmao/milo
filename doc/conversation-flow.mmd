@@ -2,11 +2,9 @@ flowchart TD
     A([Mensagem recebida]) --> B{Duplicada?<br/>update_id já visto}
     B -- sim --> Z1([Ignorar])
     B -- não --> C[Salvar mensagem original<br/>imutável]
-    C --> D{Existe pergunta<br/>pendente?}
+    C --> D{Existem<br/>pendências abertas?}
 
-    D -- sim --> E{Expirou?}
-    E -- sim --> E1[Pendência EXPIRED<br/>rascunho CANCELLED] --> F
-    E -- não --> G{Responde à<br/>pergunta pendente?<br/>reply_to ou resolvedor}
+    D -- sim --> G{Responde a<br/>uma pendência?<br/>reply_to ou resolvedor}
     G -- sim --> H[Preencher campo pendente<br/>origem = user_stated]
     H --> M
     G -- não --> F
@@ -22,13 +20,15 @@ flowchart TD
     I -- consulta --> Q[Consulta somente leitura<br/>SQL calcula os totais] --> R1([Responder com o resultado])
     I -- corrigir / desfazer --> K[Carregar última<br/>operação gravada] --> K1[Aplicar alteração<br/>manter histórico] --> R2([Responder com novo resumo])
     I -- registrar --> L[Regras de domínio<br/>derivar categoria<br/>aplicar padrões do usuário]
-    L --> M{Faltam campos<br/>obrigatórios?<br/>calculado pelo backend}
-    M -- sim --> N[Salvar operação DRAFT<br/>+ pergunta pendente<br/>com expires_at] --> R3([Fazer UMA pergunta])
-    M -- não --> O[Gravar operação<br/>status COMMITTED] --> R4([Responder resumo<br/>com botão Desfazer])
+    L --> DUP{Possível<br/>duplicata?<br/>regra determinística}
+    DUP -- sim --> DP[Salvar operação<br/>POSSIBLE_DUPLICATE<br/>fora dos totais] --> R5([Perguntar: foram dois?])
+    DUP -- não --> M{Faltam campos<br/>obrigatórios?<br/>calculado pelo backend}
+    M -- sim --> N[Salvar operação<br/>PENDING_CLARIFICATION<br/>entra nos totais] --> R3([Fazer UMA pergunta])
+    M -- não --> O[Salvar operação<br/>COMMITTED] --> R4([Responder resumo<br/>com botão Desfazer<br/>+ alerta se valor atípico])
 
     classDef llm fill:#fdf2e9,stroke:#e67e22,color:#000
     classDef state fill:#eaf2f8,stroke:#2e86c1,color:#000
     classDef reply fill:#e9f7ef,stroke:#27ae60,color:#000
     class F,V1 llm
-    class C,E1,N,O,K1 state
-    class R1,R2,R3,R4,U reply
+    class C,N,O,K1,DP state
+    class R1,R2,R3,R4,R5,U reply
